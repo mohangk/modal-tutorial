@@ -130,27 +130,17 @@ These exercises perform inference only: none updates weights or starts Modal.
 
 ### 1. Understand what the prefix has already decided
 
-A prefix is the beginning of the program, not a description of what to draw. The
-model continues from exactly where it ends; it does not rewrite it.
+A **prefix** is code the model continues, not an instruction it rewrites:
 
 ```javascript
 c.width=1920;for(i=0;i<80;i++)x.fillRect(
 ```
 
-This already commits every **training stage** to the same structure:
+This already sets the canvas width, loops 80 times, and starts drawing a
+rectangle. The model mainly chooses arguments and subsequent code, which helps
+explain the similar visuals. A shorter prefix leaves more choices open.
 
-- `c.width=1920;` sets the canvas width and clears/resets the canvas each frame.
-- `for(i=0;i<80;i++)` repeats the following statement 80 times.
-- `x.fillRect(` starts a rectangle call. The next tokens must supply its arguments
-  before a valid program can do something else.
-
-The model can choose coordinates, dimensions, expressions, and more code after
-that call, but rectangles and a loop are already in the input. Similar-looking
-results are unsurprising. Compare it with `c.width=1920;`, which leaves drawing
-operations open, or `c.width=1920;for(i=0;i<80;i++)`, which retains the loop while
-allowing a different operation.
-
-Try these two runs with the **same stage and greedy decoding**:
+Compare these runs, changing only the prefix:
 
 ```bash
 uv run python run.py --stages grpo --temperature 0 --max-new-tokens 512 \
@@ -159,102 +149,74 @@ uv run python run.py --stages grpo --temperature 0 --max-new-tokens 512 \
   --prefix 'c.width=1920;'
 ```
 
-**Observe:** which code was supplied, which code was generated, and whether the
-shorter prefix changes the type of drawing. More freedom can also produce less
-reliable code; it is not automatically better. Neither command changes weights.
+**Observe:** distinguish supplied code from generated code. Does the shorter
+prefix change the drawing? More freedom can also produce less reliable code.
 
 ### 2. Understand greedy decoding versus sampling
 
-At each step, the model predicts scores/probabilities for the next token.
-**Greedy decoding** chooses the most probable token, appends it, and repeats.
-Our `--temperature 0` setting selects this path (`do_sample=False`).
-
-Suppose candidate tokens have probabilities `4: 60%`, `9: 30%`, `0: 10%`. Greedy
-chooses `4`. **Sampling** can choose any candidate retained by its sampling rules,
-with more likely tokens favored. A positive temperature enables sampling:
+**Greedy decoding** (`--temperature 0`) always selects the most probable next
+token. **Sampling** selects randomly among plausible tokens, favoring likely ones.
+Enable it with a positive temperature:
 
 ```bash
 uv run python run.py --stages grpo --prefix 'c.width=1920;' \
   --temperature 0.8 --seed 1 --max-new-tokens 512
 ```
 
-Our sampling path also uses `top_p=0.95`; other generation settings can come from
-model defaults. This is not unrestricted sampling over every possible token.
-See [Transformers' generation strategies](https://huggingface.co/docs/transformers/main/en/generation_strategies).
-
-**Observe:** compare this with the short-prefix greedy result. You have changed
-how the same model's distribution is explored, not taught it a new skill.
+Our sampling path also uses `top_p=0.95`. Compare with the short-prefix greedy
+result: decoding changed, but model weights did not.
+[More on generation strategies](https://huggingface.co/docs/transformers/main/en/generation_strategies).
 
 ### 3. Understand what a seed does
 
-A seed initializes the pseudorandom number generator used for sampling. It gives
-us a repeatable sequence of random choices, not a quality level or a new model.
-Run the sampling command above twice with seed 1, then change only `--seed 2`.
+A **seed** makes sampling's random choices repeatable. Run the command above
+twice with seed 1, then change only `--seed 2`:
 
-| Comparison | What to expect on the same setup |
-| --- | --- |
-| Same prefix, stage, temperature, seed, and budget | Usually the same generated code |
-| Different seed with sampling enabled | A different random path; a different output is possible, not guaranteed |
-| Different seed with greedy decoding | No sampling-driven change |
-| Same seed but different adapter or temperature | Output can change because token probabilities/selection rules changed |
+- Same settings and seed on the same setup usually reproduce the same code.
+- Different seeds may produce different samples; they are not quality scores.
+- Changing the seed has no effect on greedy decoding.
 
-Exact reproduction also depends on hardware, precision, and library versions.
-The seed controls our **code generation**. If the generated JavaScript itself
-uses `Math.random()`, its browser randomness is separate. Animation time `t`
-also changes the image even for fixed code.
-
-**Practice:** explain why seed 100 is not "more creative" than seed 1, and why
-using the same seed across stages does not force the same answer.
+Changing the adapter or temperature can change output even with the same seed.
+Reproduction also depends on hardware and software. The seed controls code
+sampling, not any `Math.random()` calls inside the generated animation.
 
 ### 4. Explore temperature without changing the model
 
-Keep the prefix, stage, seed, and token budget fixed. Repeat the sampling command
-with temperatures `0.3`, `0.8`, and `1.2`.
+Keep other settings fixed and try temperatures `0.3`, `0.8`, and `1.2`. Lower
+positive values favor likely tokens more strongly; higher values broaden choices
+and can increase both variety and errors.
 
-Lower positive temperatures concentrate probability toward likely tokens; higher
-values flatten the distribution. Higher temperature can increase exploration and
-also syntax errors or incoherent code. It does not guarantee uniqueness or quality.
-
-**Observe:** count valid programs and compare visual variety. One output at each
-setting is just an initial observation. For a stronger comparison, repeat each
-setting over the same collection of seeds.
+**Observe:** compare validity and visual variety separately. Repeat each
+setting over the same collection of seeds before drawing conclusions.
 
 ### 5. Give the model enough room, then diagnose invalid JavaScript
 
-The default is **96 new tokens**, excluding the prefix. A token is a piece of
-text, not necessarily one character or one complete JavaScript expression.
+The default is **96 new tokens**, excluding the prefix. Tokens are pieces of
+text, not necessarily characters. Use `--max-new-tokens 512` to allow more;
+generation can stop earlier on an end-of-sequence token. Omitting the flag
+restores 96, not unlimited generation. The script has no unlimited option.
 
-Use `--max-new-tokens 512` for more room. This is an upper bound: generation can
-stop sooner if the model emits an end-of-sequence token. Omitting the argument
-restores the script's 96-token default; it does not mean unlimited generation.
-There is no unlimited flag. Model context and available memory also impose limits,
-so choose a finite budget instead of letting repetitive output run indefinitely.
+Compare `tokens` with `max_new_tokens` in `results.json`:
 
-Open `results.json` and compare each result's `tokens` with `max_new_tokens`:
+- **At the limit:** inspect the ending for truncation. Retry with the same
+  settings and seed but a larger budget. The count alone is not conclusive,
+  since an end-of-sequence token could also occur at the limit.
+- **Below the limit:** more room alone will not fix syntax. Try another sample
+  or prefix.
 
-- **At the limit:** the result hit its budget. Missing a closing parenthesis,
-  quote, or brace may be truncation. Retry the same prefix, stage, temperature,
-  and seed with a larger budget to isolate that explanation. An EOS token exactly
-  at the limit can make this count ambiguous; inspect the actual ending too.
-- **Below the limit:** this run stopped before exhausting its budget. More room
-  alone will not repair its syntax. Try a different sample or prefix and compare.
+Our sampled GRPO example cut off at 96 tokens, then finished in 103 when given a
+512-token budget. Increasing the limit fixed that truncation, not every possible
+syntax error.
 
-In our saved example, a sampled GRPO program cut off at 96 tokens; the same
-seed/settings with a 512-token budget finished in 103 tokens. The limit was an
-upper bound, not a target length. This is a concrete example of fixing truncation,
-not evidence that a larger budget prevents every syntax error.
-
-If Node.js is installed, check syntax without executing generated code:
+Check syntax without executing code (replace `<timestamp>` with your run folder):
 
 ```bash
 node --check outputs/<timestamp>/grpo.js
 ```
 
-Use a real output directory in place of `<timestamp>`. Passing this check does
-not guarantee runtime success, a visible image, termination, or an attractive
-animation. The preview shows caught syntax/runtime errors; code with an infinite
-loop can still stall its tab. Generated code is kept as-is rather than repaired
-silently, so the comparison reflects what the model actually produced.
+Valid syntax does not guarantee runtime success or attractive output. The preview
+shows caught errors, though infinite loops can stall its tab. We preserve generated
+code as-is so the comparison reflects the model's actual output.
 
 ### 6. Change the adapter while keeping the input and decoding fixed
 
