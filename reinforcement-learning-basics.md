@@ -1,12 +1,12 @@
 # Reinforcement Learning Basics
 
-Notes from setting up the Modal Dojo training quickstart. The goal is to understand
+Notes from setting up the [Modal Dojo training quickstart](modal-gsm8k/README.md). The goal is to understand
 what the training run is doing, what the numbers in the recipe mean, and which
 questions are worth exploring next.
 
 ## The task we are training
 
-`training_quickstart.py` trains **Qwen3.5-4B** on a slice of **GSM8K**, a dataset of
+[`modal-gsm8k/training_quickstart.py`](modal-gsm8k/training_quickstart.py) trains **Qwen3.5-4B** on a slice of **GSM8K**, a dataset of
 grade-school math word problems. The model reads a question, generates an answer,
 and a Python function checks whether the final number matches the ground truth.
 

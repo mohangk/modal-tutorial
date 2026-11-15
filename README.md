@@ -1,55 +1,26 @@
-# modal-tutorial
+# Learning LLM training and reinforcement learning
 
-Learning project for LLM post-training on [Modal](https://modal.com) with
-[Modal Dojo](https://dojo.modal.dev).
+A learning notebook with runnable experiments. Shared concepts live at the root;
+each tutorial owns its scripts and Python environment in a separate folder.
 
-The main script, `training_quickstart.py`, follows the
-[Modal training quickstart](https://modal.com/docs/guide/training-quickstart):
-it trains Qwen3.5-4B on GSM8K with reinforcement learning and a custom,
-verifiable reward function.
+## Start here
 
-## Setup
+- [Reinforcement learning basics](reinforcement-learning-basics.md): rewards,
+  rollouts, GRPO, batching, and open questions.
+- [Modal Dojo + GSM8K](modal-gsm8k/README.md): the original Qwen3.5-4B training
+  quickstart, now in its own folder.
 
-Requirements: Python 3.12 and [uv](https://docs.astral.sh/uv/).
+## Run an experiment
 
-```bash
-uv sync
-uv run modal token info
-```
-
-Versions are pinned for compatibility:
-
-- `modal==1.6.1` — required exactly by `modal-dojo==0.1.1`.
-- Python 3.12 — Modal 1.6.1 does not support Python 3.15+.
-
-## Run the training quickstart
+The root is no longer a Python project. From here, select the experiment:
 
 ```bash
-nohup uv run python -u training_quickstart.py > training.log 2>&1 &
-disown
-tail -f training.log
+uv sync --project modal-gsm8k --locked
+uv run --project modal-gsm8k python -c "import modal, modal_dojo; print(modal.__version__)"
 ```
 
-Wait for `Launched training <run-id>: app=ap-...` before closing the terminal.
-The script has no Modal entrypoint, so use `uv run python`, not `modal run`.
+Alternatively, enter `modal-gsm8k/` and use its README's commands. Its dependency
+pins and training settings are preserved. Paid GPU runs require confirmation.
 
-Monitor runs:
-
-```bash
-uv run modal-dojo run list
-uv run modal-dojo run logs <run-id> --follow
-uv run modal-dojo open
-```
-
-## Documentation
-
-- [`AGENTS.md`](AGENTS.md) — environment, current state, gotchas, and next steps for
-  coding agents.
-- [`reinforcement-learning-basics.md`](reinforcement-learning-basics.md) — RL/GRPO
-  concepts, batching arithmetic, dataset examples, and open questions.
-
-## Notes
-
-The recipe defaults are a smoke test: one rollout step, two prompts, two responses
-per prompt, and one optimizer update. See `reinforcement-learning-basics.md` before
-scaling the run.
+[AGENTS.md](AGENTS.md) contains shared operating agreements; the Modal folder
+preserves its own setup details, run history, and troubleshooting notes.
