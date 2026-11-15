@@ -1,6 +1,6 @@
 # Reinforcement Learning Basics
 
-Notes from setting up the [Modal Dojo training quickstart](modal-gsm8k/README.md). The goal is to understand
+Shared notes from setting up the [Modal Dojo training quickstart](modal-gsm8k/README.md). The goal is to understand
 what the training run is doing, what the numbers in the recipe mean, and which
 questions are worth exploring next.
 
@@ -21,12 +21,36 @@ human labeler.
 | Training data | prompt **+ target response** | prompt **+ way to verify an answer** |
 | What the model imitates | the target text | nothing directly |
 | Learning signal | token-level cross-entropy against targets | scalar reward on generated responses |
-| Our dataset | would need worked solutions | only questions and final numeric labels |
+| Our dataset | could use numeric answers as targets; worked solutions would also teach reasoning text | questions and final numeric labels used to check generations |
 | Mode in Dojo | `loss_type="sft_loss"` | `loss_type="policy_loss"` (default) |
 
-The `gsm8k_only_answer` dataset deliberately has **no reasoning traces**. The model
-has to discover a reasoning path that produces the right number. That is why this is
-RL and not SFT.
+The `gsm8k_only_answer` dataset deliberately has **no reasoning traces**. Our script
+uses its numeric labels to score the model's own generated responses, rather than
+training it to reproduce supplied target text. That use of reward-based policy
+updates makes this RL. The same numeric labels could also be used as supervised
+targets; worked solutions are useful for SFT but are not required.
+
+### How CPT, curriculum, and LoRA fit into this comparison
+
+**Continued pretraining (CPT)** continues next-token learning from an existing
+pretrained model, often on a domain-specific corpus. In common LLM usage, **SFT**
+usually trains on curated inputs and desired responses. Both commonly use
+next-token cross-entropy; CPT's targets come automatically from the corpus,
+which is why we call it self-supervised. Existing weights alone do not define
+CPT, since SFT and RL usually start with pretrained weights too.
+
+**Curriculum learning** changes which examples or tasks are sampled over time.
+It can accompany CPT, SFT, or RL. Demoscener's curriculum stage continues learning
+from code tokens while increasingly favoring popular programs; it is not a new
+reward objective or automatically instruction SFT.
+
+**LoRA is itself a training method**, specifically a parameter-efficient way to
+learn adjustments while keeping base weights frozen. It can accompany any of
+those learning setups. Saving/loading an adapter preserves/applies existing
+learned values; it does not repeat the original training.
+
+These terms describe different dimensions, not mutually exclusive methods. See
+[training basics](training-basics.md) for examples and a comparison table.
 
 ## The training loop
 
@@ -186,8 +210,10 @@ Natalia sold 48+24 = 72 clips altogether in April and May.
 #### 72
 ```
 
-`gsm8k_only_answer` keeps the question and `72`, and removes the reasoning. The model
-has to discover the reasoning through RL.
+`gsm8k_only_answer` keeps the question and `72`, and removes the reasoning. During
+our RL run, the pretrained model generates its own reasoning and receives feedback
+on the final answer. It starts with capabilities learned during pretraining,
+rather than learning all reasoning from scratch in this small run.
 
 ## What the reward function sees
 
@@ -300,6 +326,59 @@ sample             one generated response (prompt + response)
 SFT                supervised fine-tuning on target responses
 trajectory         full interaction; prompt + response here
 ```
+
+## LoRA and the learning signal
+
+[LoRA](lora-basics.md) is a training method that controls **which parameters can
+change and how updates are represented**. Next-token learning and RL describe
+**what feedback drives those changes**; curriculum controls example selection.
+These choices can be combined. The author of [Demoscener](demoscener/lora-and-training.md)
+publishes LoRA adapters for CPT, curriculum, and GRPO stages. Our original
+GSM8K quickstart does not explicitly configure LoRA.
+
+Changing a prefix, temperature, or seed is inference, not parameter training. See
+[the practical exercises](demoscener/README.md#learning-exercise) to explore this
+distinction before paying for a training run.
+
+## Companion experiment: Demoscener and human preferences
+
+The [Demoscener experiment](demoscener/README.md) lets us inspect a second use of
+GRPO: completing tiny JavaScript animations based on a person's visual taste.
+It runs locally in its own environment, separate from Modal training.
+
+This adds a useful distinction to the SFT/RL comparison above:
+
+- **Self-supervised next-token learning:** existing text/code supplies the target
+  token. Demoscener's continued pretraining (CPT) uses this to learn Dwitter syntax.
+- **Curriculum training:** change which examples are sampled over time. The
+  author's popularity-based curriculum still uses next-token training, not RL.
+- **Reinforcement learning:** generate responses, score them, and update the
+  policy using the resulting rewards. Demoscener's GRPO stage uses human choices;
+  our math example uses an automatic correctness checker.
+
+For a language model, actions can be individual token choices. Here the reward
+judges the resulting program. The model does not need to use tools or control a
+robot for this to count as RL.
+
+The author reports groups of eight completions and selects a favorite or skips
+the group. The exact reward encoding is not specified. A one-winner 1/0 reward
+group is a useful hand-calculation exercise, rather than a claim about the
+author's implementation.
+
+Our local script compares already-trained base/CPT/curriculum/GRPO weights. This
+is **inference**, not a fresh RL loop: changing a seed or choosing a favorite does
+not update parameters. The stages have separate independently loadable adapters;
+each is applied to the same base for comparison.
+
+Check code validity and visual preference separately. Next-token perplexity,
+runtime success, and aesthetic preference measure different things. Likewise,
+GSM8K training reward and held-out accuracy measure different things. Repeat
+comparisons over multiple prefixes and avoid attributing every difference to RL:
+training stages have other differences, including the author's quantization
+settings noted in the model card.
+
+Sources: [article](https://datavorous.com/writing/demoscener/) and
+[model card](https://huggingface.co/datavorous/Demoscener-7B).
 
 ## References
 

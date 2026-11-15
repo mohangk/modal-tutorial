@@ -46,6 +46,12 @@ uv run modal token info
 | `pyproject.toml` / `uv.lock` | Pinned Python dependencies. |
 | `../reinforcement-learning-basics.md` | RL/Dojo concepts, math, and open questions. |
 
+## Repository layout
+
+This original project now lives in `modal-gsm8k/`. Shared learning notes and
+the learning index are one directory above. The sibling `../demoscener/` project
+has its own environment, model cache, and LoRA case study.
+
 ## How to run the training quickstart
 
 `training_quickstart.py` has **no Modal entrypoint or `@app.function`**. Do not run
