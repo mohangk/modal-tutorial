@@ -11,3 +11,7 @@ Preserve Python 3.12, `modal==1.6.1`, and `modal-dojo==0.1.1` unless the user as
 for changes. Read `reinforcement-learning-basics.md` before tuning training.
 Do not launch paid GPU runs without explicit confirmation. Never print or commit
 credentials. Preserve existing uncommitted work and update affected documentation.
+
+`demoscener/` owns a separate CPU PyTorch/PEFT environment, model cache, and saved
+outputs. Keep those dependencies out of the Modal project. Load only one author
+stage adapter at a time. Its inference scripts do not train or contact Modal.

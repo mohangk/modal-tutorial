@@ -10,6 +10,9 @@ each tutorial owns its scripts and Python environment in a separate folder.
 - [Modal Dojo + GSM8K](modal-gsm8k/README.md): the original Qwen3.5-4B training
   quickstart, now in its own folder.
 
+- [Demoscener](demoscener/README.md): local CPU inference with animation-code LoRA
+  adapters, saved previews, and adapter inspection.
+
 ## Run an experiment
 
 The root is no longer a Python project. From here, select the experiment:
